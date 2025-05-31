@@ -1,75 +1,185 @@
 import 'package:flutter/material.dart';
+import '../models/feedbacks_model.dart';
+import '../models/event_model.dart';
+import '../models/user_model.dart';
 
 class HomePage extends StatefulWidget {
+  final AppUser? currentUser;
+  final VoidCallback? onAuthRequired;
+  final VoidCallback? onLogout;
+
+  const HomePage({Key? key, this.currentUser, this.onAuthRequired, this.onLogout})
+    : super(key: key);
+
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _selectedIndex = 0;
-
-  // Sample event data
-  final List<Map<String, dynamic>> events = [
-    {
-      'title': 'Flutter Workshop',
-      'description': 'Learn mobile app development with Flutter',
-      'date': 'Dec 15, 2024',
-      'time': '14:00 - 17:00',
-      'location': 'Room A-101',
-      'speaker': 'John Doe',
-      'capacity': 30,
-      'registered': 18,
-      'image': 'https://via.placeholder.com/300x150/4285F4/FFFFFF?text=Flutter',
-    },
-    {
-      'title': 'AI & Machine Learning Talk',
-      'description': 'Exploring the future of artificial intelligence',
-      'date': 'Dec 18, 2024',
-      'time': '10:00 - 12:00',
-      'location': 'Auditorium',
-      'speaker': 'Jane Smith',
-      'capacity': 100,
-      'registered': 67,
-      'image': 'https://via.placeholder.com/300x150/FF6B6B/FFFFFF?text=AI+ML',
-    },
-    {
-      'title': 'Coding Night',
-      'description': 'Collaborative coding session and networking',
-      'date': 'Dec 20, 2024',
-      'time': '19:00 - 23:00',
-      'location': 'Lab B-205',
-      'speaker': 'Multiple Mentors',
-      'capacity': 50,
-      'registered': 23,
-      'image': 'https://via.placeholder.com/300x150/4ECDC4/FFFFFF?text=Coding',
-    },
-    {
-      'title': 'Web Development Bootcamp',
-      'description': 'Full-stack web development intensive course',
-      'date': 'Dec 22, 2024',
-      'time': '09:00 - 18:00',
-      'location': 'Room C-301',
-      'speaker': 'Tech Team',
-      'capacity': 25,
-      'registered': 25,
-      'image': 'https://via.placeholder.com/300x150/45B7D1/FFFFFF?text=Web+Dev',
-    },
-  ];
+  final EventService _eventService = EventService();
+  List<Event> events = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  int _userRSVPCount = 0;
 
   static const Color accentGreen = Color(0xFF39A60A);
   static const Color cardGrey = Color(0xFF222222);
 
   @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+    if (widget.currentUser != null && !widget.currentUser!.isGuest) {
+      _loadUserRSVPCount();
+    }
+  }
+  Future<void> _loadEvents() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      // Debug: Check database content
+      await _eventService.debugDatabase();
+
+      final fetchedEvents = await _eventService.getAllEvents(
+        approvedOnly: true,
+        upcomingOnly: true,
+        limit: 10,
+        currentUserId: widget.currentUser?.userId,
+      );
+
+      setState(() {
+        events = fetchedEvents;
+        _isLoading = false;
+      });
+
+      print('✅ Loaded ${events.length} events successfully');
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load events: $e';
+      });
+      print('❌ Error loading events: $e');
+    }
+  }
+
+  Future<void> _loadUserRSVPCount() async {
+    if (widget.currentUser == null || widget.currentUser!.isGuest) return;
+
+    try {
+      final userEvents = await _eventService.getUserAttendingEvents(
+        widget.currentUser!.userId!,
+      );
+      setState(() {
+        _userRSVPCount = userEvents.length;
+      });
+    } catch (e) {
+      print('Error loading user RSVP count: $e');
+    }
+  }
+
+  Future<void> _handleRSVP(Event event) async {
+    if (widget.currentUser == null || widget.currentUser!.isGuest) {
+      _showLoginRequiredDialog();
+      return;
+    }
+
+    try {
+      bool success;
+      if (event.isUserAttending) {
+        success = await _eventService.cancelRsvp(
+          event.eventId,
+          widget.currentUser!.userId!,
+        );
+      } else {
+        success = await _eventService.rsvpToEvent(
+          event.eventId,
+          widget.currentUser!.userId!,
+        );
+      }
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              event.isUserAttending
+                  ? 'RSVP cancelled for ${event.eventName}'
+                  : 'Successfully registered for ${event.eventName}!',
+            ),
+            backgroundColor: accentGreen,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        _loadEvents();
+        _loadUserRSVPCount();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update RSVP. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showLoginRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: cardGrey,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Account Required',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: Text(
+            'Please create an account to register for events and access additional features.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: TextStyle(color: Colors.white70)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                widget.onAuthRequired?.call();
+              },
+              child: Text('Sign Up', style: TextStyle(color: accentGreen)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isGuest = widget.currentUser?.isGuest ?? true;
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
           '1337 Events',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
         backgroundColor: Colors.black,
         elevation: 0,
@@ -81,96 +191,444 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.person, color: Colors.white),
-            onPressed: () {
-              // Navigate to profile
-            },
+            icon: Icon(Icons.refresh, color: Colors.white),
+            onPressed: _loadEvents,
+          ),
+          if (isGuest)
+            IconButton(
+              icon: Icon(Icons.login, color: accentGreen),
+              onPressed: widget.onAuthRequired,
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.person, color: Colors.white),
+              onPressed: () {
+                // Navigate to profile
+              },
+            ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadEvents,
+        color: accentGreen,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 20),
+
+              // Guest banner
+              if (isGuest)
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: accentGreen.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: accentGreen.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: accentGreen),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'You\'re browsing as a guest. Sign up to Register for events!',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: widget.onAuthRequired,
+                        child: Text(
+                          'Sign Up',
+                          style: TextStyle(color: accentGreen),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              if (isGuest) SizedBox(height: 20),
+
+              // Quick Stats
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        'Upcoming Events',
+                        '${events.length}',
+                        Icons.event,
+                      ),
+                    ),
+                    SizedBox(width: 15),
+                    Expanded(
+                      child: _buildStatCard(
+                        isGuest ? 'Sign up to RSVP' : 'My RSVPs',
+                        isGuest ? '-' : '$_userRSVPCount',
+                        Icons.check_circle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 30),
+
+              // Section Title
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Upcoming Events',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        // Navigate to all events page
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text('View All'),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 10),
+
+              // Content based on loading state
+              if (_isLoading)
+                _buildLoadingWidget()
+              else if (_errorMessage != null)
+                _buildErrorWidget()
+              else if (events.isEmpty)
+                _buildEmptyStateWidget()
+              else
+                _buildEventsList(),
+
+              SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: widget.currentUser?.canCreateEvents == true
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/create-event');
+              },
+              backgroundColor: accentGreen,
+              child: Icon(Icons.add, color: Colors.white),
+            )
+          : null,
+    );
+  }
+
+  // ... rest of the widget methods remain the same but update RSVP button text for guests
+
+  Widget _buildEventCard(Event event) {
+    final isGuest = widget.currentUser?.isGuest ?? true;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: cardGrey,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            spreadRadius: 1,
+            blurRadius: 10,
+            offset: Offset(0, 3),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 20),
-
-            // Quick Stats
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Upcoming Events',
-                      '${events.length}',
-                      Icons.event,
-                    ),
-                  ),
-                  SizedBox(width: 15),
-                  Expanded(
-                    child: _buildStatCard(
-                      'My RSVPs',
-                      '3',
-                      Icons.check_circle,
-                    ),
-                  ),
-                ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Event Image Placeholder
+          Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [accentGreen.withOpacity(0.8), accentGreen],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
               ),
             ),
-
-            SizedBox(height: 30),
-
-            // Section Title
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Icon(Icons.event, size: 50, color: Colors.white),
+                  SizedBox(height: 8),
                   Text(
-                    'Upcoming Events',
+                    event.eventName,
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      // View all events
-                    },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Text('View All'),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
+          ),
 
-            SizedBox(height: 10),
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Event Title
+                Text(
+                  event.eventName,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
 
-            // Events List
-            ListView.builder(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              itemCount: events.length,
-              itemBuilder: (context, index) {
-                return _buildEventCard(events[index]);
-              },
+                SizedBox(height: 8),
+
+                // Event Description
+                if (event.eventDescription != null)
+                  Text(
+                    event.eventDescription!,
+                    style: TextStyle(fontSize: 14, color: Colors.white70),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+
+                SizedBox(height: 15),
+
+                // Event Details
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: Colors.white),
+                    SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        '${event.eventDate.day}/${event.eventDate.month}/${event.eventDate.year}',
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ),
+                    Icon(Icons.access_time, size: 16, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      '${event.eventDate.hour.toString().padLeft(2, '0')}:${event.eventDate.minute.toString().padLeft(2, '0')}',
+                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.white),
+                    SizedBox(width: 5),
+                    Expanded(
+                      child: Text(
+                        event.eventLocation,
+                        style: TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                    ),
+                    if (event.eventSpeakers != null) ...[
+                      Icon(Icons.person, size: 16, color: Colors.white),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          event.eventSpeakers!,
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                SizedBox(height: 15),
+
+                // Capacity and RSVP
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Capacity',
+                          style: TextStyle(fontSize: 12, color: Colors.white70),
+                        ),
+                        Text(
+                          event.eventMaxCapacity != null
+                              ? '${event.attendeeCount}/${event.eventMaxCapacity}'
+                              : '${event.attendeeCount} registered',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: event.isFull ? Colors.red : accentGreen,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    ElevatedButton(
+                      onPressed: () => _handleRSVP(event),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isGuest
+                            ? accentGreen.withOpacity(0.7)
+                            : event.isUserAttending
+                            ? Colors.orange
+                            : event.isFull
+                            ? Colors.grey
+                            : accentGreen,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        isGuest
+                            ? 'Sign Up to RSVP'
+                            : event.isUserAttending
+                            ? 'Cancel'
+                            : event.isFull
+                            ? 'Full'
+                            : 'RSVP',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            SizedBox(height: 20),
+  // Add the missing widget methods
+  Widget _buildLoadingWidget() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Column(children: List.generate(3, (index) => _buildLoadingCard())),
+    );
+  }
+
+  Widget _buildLoadingCard() {
+    return Container(
+      margin: EdgeInsets.only(bottom: 20),
+      height: 300,
+      decoration: BoxDecoration(
+        color: cardGrey,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Center(child: CircularProgressIndicator(color: accentGreen)),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardGrey,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, size: 50, color: Colors.red),
+            SizedBox(height: 10),
+            Text(
+              'Error Loading Events',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 5),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 15),
+            ElevatedButton(
+              onPressed: _loadEvents,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentGreen,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Retry'),
+            ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, '/create-event');
-        },
-        backgroundColor: accentGreen,
-        child: Icon(Icons.add, color: Colors.white),
+    );
+  }
+
+  Widget _buildEmptyStateWidget() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: cardGrey,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.event_note, size: 80, color: Colors.white54),
+            SizedBox(height: 20),
+            Text(
+              'No Events Available',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'There are no upcoming events at the moment. Check back later!',
+              style: TextStyle(color: Colors.white70),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildEventsList() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.symmetric(horizontal: 20),
+      itemCount: events.length,
+      itemBuilder: (context, index) {
+        return _buildEventCard(events[index]);
+      },
     );
   }
 
@@ -204,239 +662,11 @@ class _HomePageState extends State<HomePage> {
           SizedBox(height: 5),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white70,
-            ),
+            style: TextStyle(fontSize: 12, color: Colors.white70),
             textAlign: TextAlign.center,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildEventCard(Map<String, dynamic> event) {
-    bool isFull = event['registered'] >= event['capacity'];
-
-    return Container(
-      margin: EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: cardGrey,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Event Image
-          ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(15),
-              topRight: Radius.circular(15),
-            ),
-            child: event['image'] != null
-                ? Image.network(
-                    event['image'],
-                    height: 150,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 150,
-                      color: Colors.grey[800],
-                      child: Center(
-                        child: Icon(Icons.event, size: 50, color: Colors.white),
-                      ),
-                    ),
-                  )
-                : Container(
-                    height: 150,
-                    color: Colors.grey[800],
-                    child: Center(
-                      child: Icon(Icons.event, size: 50, color: Colors.white),
-                    ),
-                  ),
-          ),
-
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Event Title
-                Text(
-                  event['title'],
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-
-                SizedBox(height: 8),
-
-                // Event Description
-                Text(
-                  event['description'],
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white70,
-                  ),
-                ),
-
-                SizedBox(height: 15),
-
-                // Event Details
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      event['date'],
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                    SizedBox(width: 15),
-                    Icon(Icons.access_time, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      event['time'],
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 8),
-
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      event['location'],
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                    SizedBox(width: 15),
-                    Icon(Icons.person, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      event['speaker'],
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 15),
-
-                // Capacity and RSVP
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Capacity',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
-                        ),
-                        Text(
-                          '${event['registered']}/${event['capacity']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: isFull ? Colors.red : accentGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    ElevatedButton(
-                      onPressed: isFull
-                          ? null
-                          : () {
-                              _showRSVPDialog(event['title']);
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isFull ? Colors.grey : accentGreen,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        disabledBackgroundColor: Colors.grey[700],
-                        disabledForegroundColor: Colors.white54,
-                        elevation: 0,
-                      ),
-                      child: Text(isFull ? 'Full' : 'RSVP'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showRSVPDialog(String eventTitle) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: cardGrey,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: Text('RSVP Confirmation', style: TextStyle(color: Colors.white)),
-          content: Text(
-            'Do you want to register for "$eventTitle"?',
-            style: TextStyle(color: Colors.white70),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: accentGreen,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Successfully registered for $eventTitle!'),
-                    backgroundColor: accentGreen,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentGreen,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
-              ),
-              child: Text('Confirm'),
-            ),
-          ],
-        );
-      },
     );
   }
 }
