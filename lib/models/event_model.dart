@@ -28,6 +28,11 @@ class Event {
   });
 
   factory Event.fromSupabase(Map<String, dynamic> json, {int? currentUserId}) {
+    // Debug: Print the attendee_count value to see what type it is
+    print(
+      '🔍 attendee_count value: ${json['attendee_count']} (type: ${json['attendee_count'].runtimeType})',
+    );
+
     return Event(
       eventId: json['event_id'] as int,
       eventName: json['event_name'] as String,
@@ -40,9 +45,26 @@ class Event {
       eventStatus: EventStatus.fromString(
         json['event_status'] as String? ?? 'pending',
       ),
-      attendeeCount: json['attendee_count'] as int? ?? 0,
+      attendeeCount: _safeParseInt(json['attendee_count']),
       isUserAttending: json['is_user_attending'] as bool? ?? false,
     );
+  }
+
+  static int _safeParseInt(dynamic value) {
+    try {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is List) {
+        if (value.isEmpty) return 0;
+        return _safeParseInt(value.first);
+      }
+      if (value is String) return int.tryParse(value) ?? 0;
+      if (value is double) return value.round();
+      return 0;
+    } catch (e) {
+      print('❌ Error parsing int from $value: $e');
+      return 0;
+    }
   }
 
   Map<String, dynamic> toSupabaseInsert() {

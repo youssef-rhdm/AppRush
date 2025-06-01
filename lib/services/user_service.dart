@@ -22,7 +22,32 @@ class UserService {
       return null;
     }
   }
+  Future<AppUser?> getCurrentUser() async {
+    try {
+      // Get the current authenticated user
+      final authUser = _supabase.auth.currentUser;
 
+      if (authUser == null) {
+        return null; // No authenticated user
+      }
+
+      // Fetch user data from your users_table using the auth user ID
+      final response = await _supabase
+          .from('users_table')
+          .select()
+          .eq('auth_provider_id', authUser.id)
+          .single();
+
+      if (response != null) {
+        return AppUser.fromSupabase(response);
+      }
+
+      return null;
+    } catch (e) {
+      print('Error getting current user: $e');
+      return null;
+    }
+  }
   // Create a new user
   Future<AppUser?> createUser({
     required String userName,

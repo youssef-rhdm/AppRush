@@ -1,7 +1,9 @@
+import 'package:apprush/utils/app_themes.dart';
 import 'package:flutter/material.dart';
 import '../models/feedbacks_model.dart';
 import '../models/event_model.dart';
 import '../models/user_model.dart';
+import 'event_details_page.dart';
 
 class HomePage extends StatefulWidget {
   final AppUser? currentUser;
@@ -22,8 +24,15 @@ class _HomePageState extends State<HomePage> {
   String? _errorMessage;
   int _userRSVPCount = 0;
 
-  static const Color accentGreen = Color(0xFF39A60A);
-  static const Color cardGrey = Color(0xFF222222);
+    Color get accentGreen => Theme.of(context).primaryColor;
+  Color get cardColor =>
+      Theme.of(context).cardTheme.color ??
+      Theme.of(context).colorScheme.surface;
+  Color get backgroundColor => Theme.of(context).scaffoldBackgroundColor;
+  Color get textColor =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white;
+  Color get subtitleColor =>
+      Theme.of(context).textTheme.bodyMedium?.color ?? Colors.white70;
 
   @override
   void initState() {
@@ -43,12 +52,23 @@ class _HomePageState extends State<HomePage> {
       // Debug: Check database content
       await _eventService.debugDatabase();
 
-      final fetchedEvents = await _eventService.getAllEvents(
+      // First try to get upcoming events
+      List<Event> fetchedEvents = await _eventService.getAllEvents(
         approvedOnly: true,
         upcomingOnly: true,
         limit: 10,
         currentUserId: widget.currentUser?.userId,
       );
+
+      // If no upcoming events, get recent past events for demo
+      if (fetchedEvents.isEmpty) {
+        fetchedEvents = await _eventService.getAllEvents(
+          approvedOnly: true,
+          upcomingOnly: false,
+          limit: 10,
+          currentUserId: widget.currentUser?.userId,
+        );
+      }
 
       setState(() {
         events = fetchedEvents;
@@ -140,7 +160,7 @@ class _HomePageState extends State<HomePage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: cardGrey,
+          backgroundColor: AppThemes.cardGrey,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -170,47 +190,76 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
+
+
+
+  void _navigateToEventDetails(Event event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EventDetailsPage(
+          event: event,
+          currentUser: widget.currentUser,
+          onAuthRequired: widget.onAuthRequired,
+          onRSVPChanged: () {
+            _loadEvents();
+            _loadUserRSVPCount();
+          },
+        ),
+      ),
+    );
+  }
+  @override
+
   @override
   Widget build(BuildContext context) {
     final isGuest = widget.currentUser?.isGuest ?? true;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
           '1337 Events',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: theme.appBarTheme.foregroundColor,
+          ),
         ),
-        backgroundColor: Colors.black,
-        elevation: 0,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        elevation: theme.appBarTheme.elevation,
         actions: [
           IconButton(
-            icon: Icon(Icons.search, color: Colors.white),
+            icon: Icon(Icons.search, color: theme.appBarTheme.foregroundColor),
             onPressed: () {
-              // Implement search functionality
+              // TODO: Implement search
             },
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: theme.appBarTheme.foregroundColor),
             onPressed: _loadEvents,
           ),
           if (isGuest)
-            IconButton(
-              icon: Icon(Icons.login, color: accentGreen),
+            TextButton(
               onPressed: widget.onAuthRequired,
+              child: Text('Sign In', style: TextStyle(color: theme.primaryColor)),
             )
           else
-            IconButton(
-              icon: Icon(Icons.person, color: Colors.white),
-              onPressed: () {
-                // Navigate to profile
-              },
+            Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'RSVPs: $_userRSVPCount',
+                  style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+                ),
+              ),
             ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadEvents,
-        color: accentGreen,
+        color: theme.primaryColor,
         child: SingleChildScrollView(
           physics: AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -224,25 +273,25 @@ class _HomePageState extends State<HomePage> {
                   margin: EdgeInsets.symmetric(horizontal: 20),
                   padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: accentGreen.withOpacity(0.1),
+                    color: theme.primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: accentGreen.withOpacity(0.3)),
+                    border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: accentGreen),
+                      Icon(Icons.info_outline, color: theme.primaryColor),
                       SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'You\'re browsing as a guest. Sign up to Register for events!',
-                          style: TextStyle(color: Colors.white70),
+                          style: TextStyle(color: theme.textTheme.bodyMedium?.color),
                         ),
                       ),
                       TextButton(
                         onPressed: widget.onAuthRequired,
                         child: Text(
                           'Sign Up',
-                          style: TextStyle(color: accentGreen),
+                          style: TextStyle(color: theme.primaryColor),
                         ),
                       ),
                     ],
@@ -288,17 +337,17 @@ class _HomePageState extends State<HomePage> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: theme.textTheme.headlineSmall?.color,
                       ),
                     ),
                     TextButton(
                       onPressed: () {
                         // Navigate to all events page
                       },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
+                      child: Text(
+                        'View All',
+                        style: TextStyle(color: theme.textTheme.bodyMedium?.color),
                       ),
-                      child: Text('View All'),
                     ),
                   ],
                 ),
@@ -326,26 +375,23 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 Navigator.pushNamed(context, '/create-event');
               },
-              backgroundColor: accentGreen,
+              backgroundColor: theme.primaryColor,
               child: Icon(Icons.add, color: Colors.white),
             )
           : null,
     );
   }
 
-  // ... rest of the widget methods remain the same but update RSVP button text for guests
-
-  Widget _buildEventCard(Event event) {
-    final isGuest = widget.currentUser?.isGuest ?? true;
-
+  Widget _buildStatCard(String title, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Container(
-      margin: EdgeInsets.only(bottom: 20),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cardGrey,
+        color: cardColor,
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.1),
             spreadRadius: 1,
             blurRadius: 10,
             offset: Offset(0, 3),
@@ -355,169 +401,26 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Event Image Placeholder
-          Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [accentGreen.withOpacity(0.8), accentGreen],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: theme.primaryColor, size: 24),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.titleLarge?.color,
+                ),
               ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(15),
-                topRight: Radius.circular(15),
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event, size: 50, color: Colors.white),
-                  SizedBox(height: 8),
-                  Text(
-                    event.eventName,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            ],
           ),
-
-          Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Event Title
-                Text(
-                  event.eventName,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-
-                SizedBox(height: 8),
-
-                // Event Description
-                if (event.eventDescription != null)
-                  Text(
-                    event.eventDescription!,
-                    style: TextStyle(fontSize: 14, color: Colors.white70),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-
-                SizedBox(height: 15),
-
-                // Event Details
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        '${event.eventDate.day}/${event.eventDate.month}/${event.eventDate.year}',
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
-                    ),
-                    Icon(Icons.access_time, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Text(
-                      '${event.eventDate.hour.toString().padLeft(2, '0')}:${event.eventDate.minute.toString().padLeft(2, '0')}',
-                      style: TextStyle(fontSize: 12, color: Colors.white70),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 8),
-
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.white),
-                    SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        event.eventLocation,
-                        style: TextStyle(fontSize: 12, color: Colors.white70),
-                      ),
-                    ),
-                    if (event.eventSpeakers != null) ...[
-                      Icon(Icons.person, size: 16, color: Colors.white),
-                      SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          event.eventSpeakers!,
-                          style: TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-
-                SizedBox(height: 15),
-
-                // Capacity and RSVP
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Capacity',
-                          style: TextStyle(fontSize: 12, color: Colors.white70),
-                        ),
-                        Text(
-                          event.eventMaxCapacity != null
-                              ? '${event.attendeeCount}/${event.eventMaxCapacity}'
-                              : '${event.attendeeCount} registered',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: event.isFull ? Colors.red : accentGreen,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    ElevatedButton(
-                      onPressed: () => _handleRSVP(event),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isGuest
-                            ? accentGreen.withOpacity(0.7)
-                            : event.isUserAttending
-                            ? Colors.orange
-                            : event.isFull
-                            ? Colors.grey
-                            : accentGreen,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: Text(
-                        isGuest
-                            ? 'Sign Up to RSVP'
-                            : event.isUserAttending
-                            ? 'Cancel'
-                            : event.isFull
-                            ? 'Full'
-                            : 'RSVP',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          SizedBox(height: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.textTheme.bodyMedium?.color,
             ),
           ),
         ],
@@ -525,33 +428,43 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Add the missing widget methods
   Widget _buildLoadingWidget() {
+    final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Column(children: List.generate(3, (index) => _buildLoadingCard())),
-    );
-  }
-
-  Widget _buildLoadingCard() {
-    return Container(
-      margin: EdgeInsets.only(bottom: 20),
-      height: 300,
-      decoration: BoxDecoration(
-        color: cardGrey,
-        borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Center(
+          child: Column(
+            children: [
+              CircularProgressIndicator(color: theme.primaryColor),
+              SizedBox(height: 16),
+              Text(
+                'Loading Events...',
+                style: TextStyle(
+                  color: theme.textTheme.bodyMedium?.color,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Center(child: CircularProgressIndicator(color: accentGreen)),
     );
   }
 
   Widget _buildErrorWidget() {
+    final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        padding: EdgeInsets.all(20),
+        padding: EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: cardGrey,
+          color: cardColor,
           borderRadius: BorderRadius.circular(15),
         ),
         child: Column(
@@ -563,20 +476,20 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: theme.textTheme.titleLarge?.color,
               ),
             ),
             SizedBox(height: 5),
             Text(
               _errorMessage ?? 'Unknown error occurred',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 15),
             ElevatedButton(
               onPressed: _loadEvents,
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentGreen,
+                backgroundColor: theme.primaryColor,
                 foregroundColor: Colors.white,
               ),
               child: Text('Retry'),
@@ -588,30 +501,31 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyStateWidget() {
+    final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         padding: EdgeInsets.all(40),
         decoration: BoxDecoration(
-          color: cardGrey,
+          color: cardColor,
           borderRadius: BorderRadius.circular(15),
         ),
         child: Column(
           children: [
-            Icon(Icons.event_note, size: 80, color: Colors.white54),
-            SizedBox(height: 20),
+            Icon(Icons.event_busy, color: theme.textTheme.bodyMedium?.color, size: 64),
+            SizedBox(height: 16),
             Text(
-              'No Events Available',
+              'No events available',
               style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: theme.textTheme.titleLarge?.color,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 8),
             Text(
-              'There are no upcoming events at the moment. Check back later!',
-              style: TextStyle(color: Colors.white70),
+              'Check back later for new events!',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
               textAlign: TextAlign.center,
             ),
           ],
@@ -621,52 +535,277 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEventsList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+    return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20),
-      itemCount: events.length,
-      itemBuilder: (context, index) {
-        return _buildEventCard(events[index]);
-      },
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        itemCount: events.length,
+        itemBuilder: (context, index) {
+          final event = events[index];
+          return _buildEventCard(event);
+        },
+      ),
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon) {
-    return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: cardGrey,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white, size: 30),
-          SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+  Widget _buildEventCard(Event event) {
+    final isGuest = widget.currentUser?.isGuest ?? true;
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => _navigateToEventDetails(event),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              spreadRadius: 1,
+              blurRadius: 10,
+              offset: Offset(0, 3),
             ),
-          ),
-          SizedBox(height: 5),
-          Text(
-            title,
-            style: TextStyle(fontSize: 12, color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Event Image Placeholder
+            Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [theme.primaryColor.withOpacity(0.8), theme.primaryColor],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(15),
+                  topRight: Radius.circular(15),
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.event, size: 50, color: Colors.white),
+                        SizedBox(height: 8),
+                        Text(
+                          event.eventName,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.visibility, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'View Details',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Event Title
+                  Text(
+                    event.eventName,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.textTheme.titleLarge?.color,
+                    ),
+                  ),
+
+                  SizedBox(height: 8),
+
+                  // Event Description
+                  if (event.eventDescription != null)
+                    Text(
+                      event.eventDescription!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+
+                  SizedBox(height: 15),
+
+                  // Event Details
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          '${event.eventDate.day}/${event.eventDate.month}/${event.eventDate.year}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.access_time, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      SizedBox(width: 5),
+                      Text(
+                        '${event.eventDate.hour.toString().padLeft(2, '0')}:${event.eventDate.minute.toString().padLeft(2, '0')}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.textTheme.bodyMedium?.color,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 8),
+
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          event.eventLocation,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.textTheme.bodyMedium?.color,
+                          ),
+                        ),
+                      ),
+                      if (event.eventSpeakers != null) ...[
+                        Icon(Icons.person, size: 16, color: theme.textTheme.bodyMedium?.color),
+                        SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            event.eventSpeakers!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.textTheme.bodyMedium?.color,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+
+                  SizedBox(height: 15),
+
+                  // Capacity and RSVP
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Capacity',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.textTheme.bodyMedium?.color,
+                            ),
+                          ),
+                          Text(
+                            event.eventMaxCapacity != null
+                                ? '${event.attendeeCount}/${event.eventMaxCapacity}'
+                                : '${event.attendeeCount} registered',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: event.isFull ? Colors.red : theme.primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      Row(
+                        children: [
+                          OutlinedButton(
+                            onPressed: () => _navigateToEventDetails(event),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: theme.primaryColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: Text(
+                              'Details',
+                              style: TextStyle(color: theme.primaryColor),
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {},
+                            child: ElevatedButton(
+                              onPressed: () => _handleRSVP(event),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: isGuest
+                                    ? theme.primaryColor.withOpacity(0.7)
+                                    : event.isUserAttending
+                                    ? Colors.orange
+                                    : event.isFull
+                                    ? Colors.grey
+                                    : theme.primaryColor,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                isGuest
+                                    ? 'Sign Up'
+                                    : event.isUserAttending
+                                    ? 'Cancel'
+                                    : event.isFull
+                                    ? 'Full'
+                                    : 'RSVP',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
+  // ... rest of the widget methods remain the same but update RSVP button text for guests
 }
