@@ -47,7 +47,8 @@ class EventService {
       print('Error creating event: $e');
       return null;
     }
-  }  // Get all approved events with attendee count and user attendance status
+  } // Get all approved events with attendee count and user attendance status
+
   Future<List<Event>> getAllEvents({
     bool approvedOnly = true,
     bool upcomingOnly = true,
@@ -95,22 +96,28 @@ class EventService {
             .select('event_id')
             .eq('user_id', currentUserId);
 
-        final userEventIds = userRSVPs.map((rsvp) => rsvp['event_id'] as int).toSet();
+        final userEventIds = userRSVPs
+            .map((rsvp) => rsvp['event_id'] as int)
+            .toSet();
 
         // Update events with user attendance
-        events = events.map((event) => Event(
-          eventId: event.eventId,
-          eventName: event.eventName,
-          eventDate: event.eventDate,
-          eventLocation: event.eventLocation,
-          eventDescription: event.eventDescription,
-          eventSpeakers: event.eventSpeakers,
-          eventMaxCapacity: event.eventMaxCapacity,
-          organizerId: event.organizerId,
-          eventStatus: event.eventStatus,
-          attendeeCount: event.attendeeCount,
-          isUserAttending: userEventIds.contains(event.eventId),
-        )).toList();
+        events = events
+            .map(
+              (event) => Event(
+                eventId: event.eventId,
+                eventName: event.eventName,
+                eventDate: event.eventDate,
+                eventLocation: event.eventLocation,
+                eventDescription: event.eventDescription,
+                eventSpeakers: event.eventSpeakers,
+                eventMaxCapacity: event.eventMaxCapacity,
+                organizerId: event.organizerId,
+                eventStatus: event.eventStatus,
+                attendeeCount: event.attendeeCount,
+                isUserAttending: userEventIds.contains(event.eventId),
+              ),
+            )
+            .toList();
       }
 
       return events;
@@ -448,7 +455,8 @@ class EventService {
       'feedback_table',
     ];
 
-    for (String table in tables) {      try {
+    for (String table in tables) {
+      try {
         print('🔍 Checking table: $table');
         await _supabase.from(table).select('*').limit(1);
         print('✅ Table $table exists and is accessible');
@@ -457,6 +465,7 @@ class EventService {
       }
     }
   }
+
   // Debug method to check what's in the database
   Future<void> debugDatabase() async {
     try {
@@ -496,7 +505,64 @@ class EventService {
           .count(CountOption.exact);
 
       print('📅 Upcoming approved events count: ${upcomingResponse.count}');
+    } catch (e) {
+      print('❌ Debug error: $e');
+    }
+  }
 
+  // Debug method to check notifications table content
+  Future<void> debugNotificationsTable() async {
+    try {
+      print('🔍 Debug: Checking notifications table content...');
+
+      // Count records in notifications table
+      final notificationsResponse = await _supabase
+          .from('notifications_table')
+          .select('*')
+          .count(CountOption.exact);
+
+      print('📊 Notifications table count: ${notificationsResponse.count}');
+
+      if (notificationsResponse.count > 0) {
+        // Fetch a sample notification record
+        final sampleNotification = await _supabase
+            .from('notifications_table')
+            .select('*')
+            .limit(1);
+        print('📝 Sample notification: ${sampleNotification.first}');
+      }
+
+      // Check unread notifications
+      final unreadNotificationsResponse = await _supabase
+          .from('notifications_table')
+          .select('*')
+          .eq('is_read', false)
+          .count(CountOption.exact);
+
+      print(
+        '✅ Unread notifications count: ${unreadNotificationsResponse.count}',
+      );
+
+      // Check upcoming reminders
+      final upcomingRemindersResponse = await _supabase
+          .from('notifications_table')
+          .select('*')
+          .eq('type', 'upcoming_reminder')
+          .gte('reminder_time', DateTime.now().toIso8601String())
+          .count(CountOption.exact);
+
+      print('📅 Upcoming reminders count: ${upcomingRemindersResponse.count}');
+
+      // Check notifications related to events
+      final eventNotificationsResponse = await _supabase
+          .from('notifications_table')
+          .select('*')
+          .not('event_id', 'is', null)
+          .count(CountOption.exact);
+
+      print(
+        '📊 Notifications linked to events count: ${eventNotificationsResponse.count}',
+      );
     } catch (e) {
       print('❌ Debug error: $e');
     }

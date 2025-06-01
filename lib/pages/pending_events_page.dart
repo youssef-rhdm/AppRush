@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 
-class CreateEventPage extends StatelessWidget {
+class PendingEventsPage extends StatelessWidget {
   final AppUser? currentUser;
   final VoidCallback onAuthRequired;
 
-  const CreateEventPage({
+  const PendingEventsPage({
     required this.currentUser,
     required this.onAuthRequired,
     Key? key,
@@ -14,8 +14,12 @@ class CreateEventPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Create Event')),
-      body: Center(child: Text('Create Event Page Content')),
+      appBar: AppBar(
+        title: Text('Pending Events'),
+      ),
+      body: Center(
+        child: Text('Pending Events Page Content'),
+      ),
     );
   }
 }

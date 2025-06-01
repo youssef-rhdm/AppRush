@@ -10,8 +10,12 @@ class HomePage extends StatefulWidget {
   final VoidCallback? onAuthRequired;
   final VoidCallback? onLogout;
 
-  const HomePage({Key? key, this.currentUser, this.onAuthRequired, this.onLogout})
-    : super(key: key);
+  const HomePage({
+    Key? key,
+    this.currentUser,
+    this.onAuthRequired,
+    this.onLogout,
+  }) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -24,7 +28,7 @@ class _HomePageState extends State<HomePage> {
   String? _errorMessage;
   int _userRSVPCount = 0;
 
-    Color get accentGreen => Theme.of(context).primaryColor;
+  Color get accentGreen => Theme.of(context).primaryColor;
   Color get cardColor =>
       Theme.of(context).cardTheme.color ??
       Theme.of(context).colorScheme.surface;
@@ -42,6 +46,7 @@ class _HomePageState extends State<HomePage> {
       _loadUserRSVPCount();
     }
   }
+
   Future<void> _loadEvents() async {
     try {
       setState(() {
@@ -51,6 +56,7 @@ class _HomePageState extends State<HomePage> {
 
       // Debug: Check database content
       await _eventService.debugDatabase();
+      await _eventService.debugNotificationsTable();
 
       // First try to get upcoming events
       List<Event> fetchedEvents = await _eventService.getAllEvents(
@@ -77,10 +83,12 @@ class _HomePageState extends State<HomePage> {
 
       print('✅ Loaded ${events.length} events successfully');
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load events: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load events: $e';
+        });
+      }
       print('❌ Error loading events: $e');
     }
   }
@@ -190,10 +198,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
-
-
-
   void _navigateToEventDetails(Event event) {
     Navigator.push(
       context,
@@ -210,8 +214,8 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  @override
 
+  @override
   @override
   Widget build(BuildContext context) {
     final isGuest = widget.currentUser?.isGuest ?? true;
@@ -243,7 +247,10 @@ class _HomePageState extends State<HomePage> {
           if (isGuest)
             TextButton(
               onPressed: widget.onAuthRequired,
-              child: Text('Sign In', style: TextStyle(color: theme.primaryColor)),
+              child: Text(
+                'Sign In',
+                style: TextStyle(color: theme.primaryColor),
+              ),
             )
           else
             Padding(
@@ -275,7 +282,9 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     color: theme.primaryColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: theme.primaryColor.withOpacity(0.3)),
+                    border: Border.all(
+                      color: theme.primaryColor.withOpacity(0.3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -284,7 +293,9 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: Text(
                           'You\'re browsing as a guest. Sign up to Register for events!',
-                          style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+                          style: TextStyle(
+                            color: theme.textTheme.bodyMedium?.color,
+                          ),
                         ),
                       ),
                       TextButton(
@@ -312,14 +323,18 @@ class _HomePageState extends State<HomePage> {
                         Icons.event,
                       ),
                     ),
-                    SizedBox(width: 15),
-                    Expanded(
-                      child: _buildStatCard(
-                        isGuest ? 'Sign up to RSVP' : 'My RSVPs',
-                        isGuest ? '-' : '$_userRSVPCount',
-                        Icons.check_circle,
+                    if (widget.currentUser != null &&
+                        (widget.currentUser!.isClubAdmin ||
+                            widget.currentUser!.isNormalUser)) ...[
+                      SizedBox(width: 15),
+                      Expanded(
+                        child: _buildStatCard(
+                          'My RSVPs',
+                          '$_userRSVPCount',
+                          Icons.check_circle,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -346,7 +361,9 @@ class _HomePageState extends State<HomePage> {
                       },
                       child: Text(
                         'View All',
-                        style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+                        style: TextStyle(
+                          color: theme.textTheme.bodyMedium?.color,
+                        ),
                       ),
                     ),
                   ],
@@ -370,15 +387,6 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-      floatingActionButton: widget.currentUser?.canCreateEvents == true
-          ? FloatingActionButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/create-event');
-              },
-              backgroundColor: theme.primaryColor,
-              child: Icon(Icons.add, color: Colors.white),
-            )
-          : null,
     );
   }
 
@@ -512,7 +520,11 @@ class _HomePageState extends State<HomePage> {
         ),
         child: Column(
           children: [
-            Icon(Icons.event_busy, color: theme.textTheme.bodyMedium?.color, size: 64),
+            Icon(
+              Icons.event_busy,
+              color: theme.textTheme.bodyMedium?.color,
+              size: 64,
+            ),
             SizedBox(height: 16),
             Text(
               'No events available',
@@ -578,7 +590,10 @@ class _HomePageState extends State<HomePage> {
               width: double.infinity,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [theme.primaryColor.withOpacity(0.8), theme.primaryColor],
+                  colors: [
+                    theme.primaryColor.withOpacity(0.8),
+                    theme.primaryColor,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -667,7 +682,11 @@ class _HomePageState extends State<HomePage> {
                   // Event Details
                   Row(
                     children: [
-                      Icon(Icons.calendar_today, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      Icon(
+                        Icons.calendar_today,
+                        size: 16,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                       SizedBox(width: 5),
                       Expanded(
                         child: Text(
@@ -678,7 +697,11 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                       ),
-                      Icon(Icons.access_time, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                       SizedBox(width: 5),
                       Text(
                         '${event.eventDate.hour.toString().padLeft(2, '0')}:${event.eventDate.minute.toString().padLeft(2, '0')}',
@@ -694,7 +717,11 @@ class _HomePageState extends State<HomePage> {
 
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: theme.textTheme.bodyMedium?.color),
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
                       SizedBox(width: 5),
                       Expanded(
                         child: Text(
@@ -706,7 +733,11 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       if (event.eventSpeakers != null) ...[
-                        Icon(Icons.person, size: 16, color: theme.textTheme.bodyMedium?.color),
+                        Icon(
+                          Icons.person,
+                          size: 16,
+                          color: theme.textTheme.bodyMedium?.color,
+                        ),
                         SizedBox(width: 5),
                         Expanded(
                           child: Text(
@@ -744,7 +775,9 @@ class _HomePageState extends State<HomePage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: event.isFull ? Colors.red : theme.primaryColor,
+                              color: event.isFull
+                                  ? Colors.red
+                                  : theme.primaryColor,
                             ),
                           ),
                         ],
@@ -807,5 +840,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  // ... rest of the widget methods remain the same but update RSVP button text for guests
 }

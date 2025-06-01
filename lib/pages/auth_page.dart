@@ -17,24 +17,26 @@ class _AuthPageState extends State<AuthPage> {
   final UserService _userService = UserService();
   bool _isLoading = false;
 
-  Future<void> _createTestUser() async {
+  Future<void> _authenticateWith42() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
+      // TODO: Replace with actual 42 authentication
+      // Temporary implementation for testing
       final user = await _userService.createUser(
-        userName: 'Test User',
-        userType: UserType.normalUser,
-        authProviderId: 'test-user-${DateTime.now().millisecondsSinceEpoch}',
+        userName: '42 User',
+        userType: UserType.admin, // Changed from 'user' to 'normal'
+        authProviderId: '42-user-${DateTime.now().millisecondsSinceEpoch}',
       );
 
       if (user != null) {
         widget.onUserAuthenticated(user);
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to create user')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to authenticate with 42')),
+        );
       }
     } catch (e) {
       ScaffoldMessenger.of(
@@ -79,7 +81,7 @@ class _AuthPageState extends State<AuthPage> {
               ),
               SizedBox(height: 16),
               Text(
-                'Sign up to create events and RSVP',
+                'Sign in with your 42 account to create events and RSVP',
                 style: TextStyle(fontSize: 16, color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
@@ -87,7 +89,7 @@ class _AuthPageState extends State<AuthPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _createTestUser,
+                  onPressed: _isLoading ? null : _authenticateWith42,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF39A60A),
                     foregroundColor: Colors.white,
@@ -98,7 +100,10 @@ class _AuthPageState extends State<AuthPage> {
                   ),
                   child: _isLoading
                       ? CircularProgressIndicator(color: Colors.white)
-                      : Text('Create Account', style: TextStyle(fontSize: 16)),
+                      : Text(
+                          'Sign in with 42 Account',
+                          style: TextStyle(fontSize: 16),
+                        ),
                 ),
               ),
               if (widget.onCancel != null) ...[
@@ -106,7 +111,7 @@ class _AuthPageState extends State<AuthPage> {
                 TextButton(
                   onPressed: widget.onCancel,
                   child: Text(
-                    'Continue as Guest',
+                    'Cancel',
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                 ),
