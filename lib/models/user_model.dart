@@ -4,6 +4,7 @@ class AppUser {
   final String? userImage;
   final UserType userType;
   final String? authProviderId;
+  final String? email;
   final bool isGuest;
 
   AppUser({
@@ -13,6 +14,7 @@ class AppUser {
     required this.userType,
     this.authProviderId,
     this.isGuest = false,
+    this.email,
   });
 
   // Factory for guest users

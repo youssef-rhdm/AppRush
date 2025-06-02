@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 class AppThemes {
-  static const Color accentGreen = Color(0xFF39A60A);
-  static const Color cardGrey = Color(0xFF222222);
+  static const Color accentGreen = Color(0xff305945);
+  static const Color cardGrey = Color.fromARGB(255, 14, 13, 12);
   static const Color lightCardGrey = Color(0xFFF5F5F5);
 
   static ThemeData get darkTheme {
@@ -49,7 +49,7 @@ class AppThemes {
           ),
         ),
       ),
-       textTheme: TextTheme(
+      textTheme: TextTheme(
         displayLarge: TextStyle(color: Colors.white),
         displayMedium: TextStyle(color: Colors.white),
         displaySmall: TextStyle(color: Colors.white),
@@ -59,9 +59,9 @@ class AppThemes {
         titleLarge: TextStyle(color: Colors.white), // Dialog titles
         titleMedium: TextStyle(color: Colors.white), // List tile titles
         titleSmall: TextStyle(color: Colors.white),
-        bodyLarge: TextStyle(color: Colors.white70),
-        bodyMedium: TextStyle(color: Colors.white70), // Dialog content
-        bodySmall: TextStyle(color: Colors.white60), // List tile subtitles
+        bodyLarge: TextStyle(color: Colors.white),
+        bodyMedium: TextStyle(color: Colors.white), // Dialog content
+        bodySmall: TextStyle(color: Colors.white), // List tile subtitles
       ),
       iconTheme: IconThemeData(
         color: Colors.white,
@@ -70,7 +70,7 @@ class AppThemes {
         primary: accentGreen,
         secondary: accentGreen,
         surface: cardGrey,
-        background: Colors.black,
+        background: Colors.white,
         onSurface: Colors.white, // Text on surfaces
         onBackground: Colors.white, // Text on background
       ),

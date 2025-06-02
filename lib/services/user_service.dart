@@ -11,46 +11,37 @@ class UserService {
           .from('users_table')
           .select()
           .eq('auth_provider_id', authProviderId)
-          .single();
+          .maybeSingle();
 
-      return AppUser.fromSupabase(response);
-    } on PostgrestException catch (e) {
-      print('Database error fetching user: ${e.message}');
-      return null;
+      return response == null ? null : AppUser.fromSupabase(response);
     } catch (e) {
-      print('Error fetching user: $e');
+      print('Error fetching user by auth ID: $e');
       return null;
     }
   }
-  Future<AppUser?> getCurrentUser() async {
+
+  Future<AppUser?> getUserByUserName(String userName) async {
     try {
-      // Get the current authenticated user
-      final authUser = _supabase.auth.currentUser;
-
-      if (authUser == null) {
-        return null; // No authenticated user
-      }
-
-      // Fetch user data from your users_table using the auth user ID
       final response = await _supabase
           .from('users_table')
           .select()
-          .eq('auth_provider_id', authUser.id)
-          .single();
+          .eq('user_name', userName)
+          .maybeSingle(); // Use maybeSingle instead of single
 
-      if (response != null) {
-        return AppUser.fromSupabase(response);
-      }
-
+      return response == null ? null : AppUser.fromSupabase(response);
+    } on PostgrestException catch (e) {
+      print('Database error fetching user by user_name: ${e.message}');
       return null;
     } catch (e) {
-      print('Error getting current user: $e');
+      print('Error fetching user by user_name: $e');
       return null;
     }
   }
+
   // Create a new user
   Future<AppUser?> createUser({
     required String userName,
+    required String email,
     String? userImage,
     required UserType userType,
     required String authProviderId,
@@ -163,22 +154,6 @@ class UserService {
     }
   }
 
-  // Check if user exists by auth provider ID
-  Future<bool> userExists(String authProviderId) async {
-    try {
-      final response = await _supabase
-          .from('users_table')
-          .select('user_id')
-          .eq('auth_provider_id', authProviderId)
-          .limit(1);
-
-      return response.isNotEmpty;
-    } catch (e) {
-      print('Error checking user existence: $e');
-      return false;
-    }
-  }
-
   // Test database connection
   Future<bool> testConnection() async {
     try {
@@ -193,4 +168,3 @@ class UserService {
     }
   }
 }
-

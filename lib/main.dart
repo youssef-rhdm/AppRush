@@ -14,15 +14,18 @@ import 'utils/app_themes.dart';
 import 'pages/create_event_page.dart';
 import 'pages/pending_events_page.dart';
 import 'package:badges/badges.dart' as badges;
+import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Supabase without auth
   await Supabase.initialize(
     url: 'https://qhpkxntqljmtgyayssna.supabase.co',
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFocGt4bnRxbGptdGd5YXlzc25hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg3MDM0MDUsImV4cCI6MjA2NDI3OTQwNX0.1xbWt4ceXG9eaXO1l5yvNHhN-vqm2MpCNm5QHhq9BTM',
   );
+
   runApp(
     ChangeNotifierProvider(
       create: (context) => ThemeProvider(),
@@ -41,28 +44,79 @@ class _EventAppState extends State<EventApp> {
   AppUser? currentUser;
   final UserService _userService = UserService();
   bool _isLoading = true;
-  bool _showAuthPage = false;
   int unreadNotificationsCount = 0;
+
   @override
   void initState() {
     super.initState();
     _initializeApp();
   }
 
+  Future<void> _initializeApp() async {
+    try {
+      // Check if we have a stored user ID (using shared_preferences)
+      final prefs = await SharedPreferences.getInstance();
+      final storedUserId = prefs.getString('current_user_id');
+
+      if (storedUserId != null) {
+        final user = await _userService.getUserByAuthId(storedUserId);
+        if (user != null && mounted) {
+          setState(() {
+            currentUser = user;
+            _isLoading = false;
+          });
+          return;
+        }
+      }
+
+      // No stored user - show auth page
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      print('Error initializing app: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _fetchUserData(String authProviderId) async {
+    try {
+      final user = await _userService.getUserByAuthId(authProviderId);
+      if (user == null) {
+        print('User not found in database');
+        return;
+      }
+
+      // Store user ID for future sessions
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('current_user_id', authProviderId);
+
+      if (mounted) {
+        setState(() => currentUser = user);
+        await _fetchUnreadNotificationsCount();
+      }
+    } catch (e) {
+      print('Error fetching user data: $e');
+    }
+  }
+
   Future<void> _fetchUnreadNotificationsCount() async {
     try {
+      if (currentUser == null) return;
       final response = await Supabase.instance.client
           .from('notifications_table')
           .select('*')
+          .eq('user_id', currentUser!.userId!)
           .eq('is_read', false)
           .count(CountOption.exact);
 
       if (mounted) {
         setState(() => unreadNotificationsCount = response.count ?? 0);
       }
-      print('✅ Unread notifications count: ${response.count}');
     } catch (e) {
-      print('❌ Error fetching unread count: $e');
+      print('Error fetching unread count: $e');
       if (mounted) {
         setState(() => unreadNotificationsCount = 0);
       }
@@ -81,61 +135,26 @@ class _EventAppState extends State<EventApp> {
         : Icon(Icons.notifications);
   }
 
-  Future<void> _initializeApp() async {
-    try {
-      // Check if user is already authenticated
-      final authUser = Supabase.instance.client.auth.currentUser;
-
-      if (authUser != null) {
-        // User is authenticated, fetch user data
-        currentUser = await _userService.getCurrentUser();
-        await _fetchUnreadNotificationsCount();
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error initializing app: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
   void _onItemTapped(int index) {
     setState(() {
       selectedIndex = index;
-      _showAuthPage = false;
-    });
-  }
-
-  void _showAuth() {
-    setState(() {
-      _showAuthPage = true;
-    });
-  }
-
-  void _hideAuth() {
-    setState(() {
-      _showAuthPage = false;
     });
   }
 
   void _onLoginSuccess(AppUser user) {
-    setState(() {
-      currentUser = user;
-      _showAuthPage = false;
-    });
-    _fetchUnreadNotificationsCount();
+    _fetchUserData(user.authProviderId!);
   }
 
-  void _onLogout() {
-    setState(() {
-      currentUser = null;
-      selectedIndex = 0;
-      _showAuthPage = false;
-    });
+  void _onLogout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+      setState(() {
+        currentUser = null;
+        selectedIndex = 0;
+      });
+    } catch (e) {
+      print('Error logging out: $e');
+    }
   }
 
   @override
@@ -159,10 +178,7 @@ class _EventAppState extends State<EventApp> {
               : currentUser == null
               ? AuthPage(
                   onUserAuthenticated: _onLoginSuccess,
-                  onCancel: () {
-                    // Optional: You can exit the app or keep showing auth page
-                    SystemNavigator.pop(); // This will close the app
-                  },
+                  onCancel: () => SystemNavigator.pop(),
                 )
               : _buildMainApp(),
         );
@@ -175,26 +191,14 @@ class _EventAppState extends State<EventApp> {
     final bottomNavItems = <BottomNavigationBarItem>[];
 
     // Always add Home page (index 0)
-    pages.add(
-      HomePage(
-        currentUser: currentUser,
-        onAuthRequired: _showAuth,
-        onLogout: _onLogout,
-      ),
-    );
+    pages.add(HomePage(currentUser: currentUser, onLogout: _onLogout));
     bottomNavItems.add(
       BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
     );
 
     if (currentUser == null || currentUser!.isGuest) {
       // Guest user - only Home and Settings
-      pages.add(
-        SettingsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-          onLogout: _onLogout,
-        ),
-      );
+      pages.add(SettingsPage(currentUser: currentUser, onLogout: _onLogout));
 
       bottomNavItems.add(
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
@@ -202,24 +206,10 @@ class _EventAppState extends State<EventApp> {
     } else if (currentUser!.isAdmin) {
       // Admin: Home, Pending Events, Create Event, Notifications, Settings
       pages.addAll([
-        PendingEventsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 1
-        CreateEventPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 2
-        NotificationsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 3
-        SettingsPage(
-          // index 4
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-          onLogout: _onLogout,
-        ),
+        // PendingEventsPage(currentUser: currentUser),
+        // CreateEventPage(currentUser: currentUser),
+        NotificationsPage(currentUser: currentUser),
+        SettingsPage(currentUser: currentUser, onLogout: _onLogout),
       ]);
 
       bottomNavItems.addAll([
@@ -240,24 +230,10 @@ class _EventAppState extends State<EventApp> {
     } else if (currentUser!.isClubAdmin) {
       // Club Admin: Home, My Events, Create Event, Notifications, Settings
       pages.addAll([
-        MyEventsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 1
-        CreateEventPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 2
-        NotificationsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 3
-        SettingsPage(
-          // index 4
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-          onLogout: _onLogout,
-        ),
+        MyEventsPage(currentUser: currentUser),
+        // CreateEventPage(currentUser: currentUser),
+        NotificationsPage(currentUser: currentUser),
+        SettingsPage(currentUser: currentUser, onLogout: _onLogout),
       ]);
 
       bottomNavItems.addAll([
@@ -275,20 +251,9 @@ class _EventAppState extends State<EventApp> {
     } else {
       // Normal User: Home, My Events, Notifications, Settings
       pages.addAll([
-        MyEventsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 1
-        NotificationsPage(
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-        ), // index 2
-        SettingsPage(
-          // index 3
-          currentUser: currentUser,
-          onAuthRequired: _showAuth,
-          onLogout: _onLogout,
-        ),
+        MyEventsPage(currentUser: currentUser),
+        NotificationsPage(currentUser: currentUser),
+        SettingsPage(currentUser: currentUser, onLogout: _onLogout),
       ]);
 
       bottomNavItems.addAll([
@@ -304,8 +269,7 @@ class _EventAppState extends State<EventApp> {
     return Scaffold(
       body: pages[selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
-        type:
-            BottomNavigationBarType.fixed, // This ensures all tabs are visible
+        type: BottomNavigationBarType.fixed,
         currentIndex: selectedIndex,
         onTap: _onItemTapped,
         items: bottomNavItems,

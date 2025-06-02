@@ -57,7 +57,8 @@ class SettingsPage extends StatelessWidget {
                     radius: 30,
                     backgroundColor: theme.primaryColor,
                     child: Text(
-                      currentUser?.userName?.substring(0, 1).toUpperCase() ?? 'U',
+                      currentUser?.userName?.substring(0, 1).toUpperCase() ??
+                          'U',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,
@@ -88,7 +89,10 @@ class SettingsPage extends StatelessWidget {
                         ),
                         SizedBox(height: 4),
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: theme.primaryColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
@@ -132,9 +136,13 @@ class SettingsPage extends StatelessWidget {
                   children: [
                     _buildSettingsTile(
                       context,
-                      icon: themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                      icon: themeProvider.isDarkMode
+                          ? Icons.dark_mode
+                          : Icons.light_mode,
                       title: 'Theme',
-                      subtitle: themeProvider.isDarkMode ? 'Dark Mode' : 'Light Mode',
+                      subtitle: themeProvider.isDarkMode
+                          ? 'Dark Mode'
+                          : 'Light Mode',
                       trailing: Switch(
                         value: themeProvider.isDarkMode,
                         onChanged: (value) {
@@ -305,7 +313,7 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
- Widget _buildSettingsTile(
+  Widget _buildSettingsTile(
     BuildContext context, {
     required IconData icon,
     required String title,
@@ -365,11 +373,17 @@ class SettingsPage extends StatelessWidget {
           children: [
             _buildProfileRow('Username', currentUser?.userName ?? 'N/A', theme),
             SizedBox(height: 12),
-            _buildProfileRow('User ID', currentUser?.userId?.toString() ?? 'N/A', theme),
+            _buildProfileRow(
+              'Email',
+              currentUser?.email?.toString() ?? 'N/A',
+              theme,
+            ),
             SizedBox(height: 12),
-            _buildProfileRow('Account Type', currentUser?.userType.displayName ?? 'N/A', theme),
-            SizedBox(height: 12),
-            _buildProfileRow('Status', currentUser?.isGuest == true ? 'Guest' : 'Registered', theme),
+            _buildProfileRow(
+              'Status',
+              currentUser?.isGuest == true ? 'Guest' : 'Registered',
+              theme,
+            ),
           ],
         ),
         actions: [
@@ -430,8 +444,16 @@ class SettingsPage extends StatelessWidget {
             ),
             SizedBox(height: 20),
             ListTile(
-              leading: Icon(Icons.brightness_auto, color: Theme.of(context).primaryColor),
-              title: Text('System Default', style: TextStyle(color: Theme.of(context).textTheme.titleMedium?.color)),
+              leading: Icon(
+                Icons.brightness_auto,
+                color: Theme.of(context).primaryColor,
+              ),
+              title: Text(
+                'System Default',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleMedium?.color,
+                ),
+              ),
               trailing: themeProvider.themeMode == ThemeMode.system
                   ? Icon(Icons.check, color: Theme.of(context).primaryColor)
                   : null,
@@ -441,8 +463,16 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.light_mode, color: Theme.of(context).primaryColor),
-              title: Text('Light Mode', style: TextStyle(color: Theme.of(context).textTheme.titleMedium?.color)),
+              leading: Icon(
+                Icons.light_mode,
+                color: Theme.of(context).primaryColor,
+              ),
+              title: Text(
+                'Light Mode',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleMedium?.color,
+                ),
+              ),
               trailing: themeProvider.themeMode == ThemeMode.light
                   ? Icon(Icons.check, color: Theme.of(context).primaryColor)
                   : null,
@@ -452,8 +482,16 @@ class SettingsPage extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.dark_mode, color: Theme.of(context).primaryColor),
-              title: Text('Dark Mode', style: TextStyle(color: Theme.of(context).textTheme.titleMedium?.color)),
+              leading: Icon(
+                Icons.dark_mode,
+                color: Theme.of(context).primaryColor,
+              ),
+              title: Text(
+                'Dark Mode',
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.titleMedium?.color,
+                ),
+              ),
               trailing: themeProvider.themeMode == ThemeMode.dark
                   ? Icon(Icons.check, color: Theme.of(context).primaryColor)
                   : null,
@@ -486,7 +524,10 @@ class SettingsPage extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: theme.textTheme.bodyMedium?.color)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -515,7 +556,10 @@ class SettingsPage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version: 1.0.0', style: TextStyle(color: theme.textTheme.bodyMedium?.color)),
+            Text(
+              'Version: 1.0.0',
+              style: TextStyle(color: theme.textTheme.bodyMedium?.color),
+            ),
             SizedBox(height: 8),
             Text(
               'A modern event management app for the 1337 community.',

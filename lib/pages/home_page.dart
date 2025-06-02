@@ -244,7 +244,8 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.refresh, color: theme.appBarTheme.foregroundColor),
             onPressed: _loadEvents,
           ),
-          if (isGuest)
+          if (widget.currentUser!.isClubAdmin ||
+              widget.currentUser!.isNormalUser)
             TextButton(
               onPressed: widget.onAuthRequired,
               child: Text(
@@ -273,43 +274,6 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20),
-
-              // Guest banner
-              if (isGuest)
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 20),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: theme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.primaryColor.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: theme.primaryColor),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'You\'re browsing as a guest. Sign up to Register for events!',
-                          style: TextStyle(
-                            color: theme.textTheme.bodyMedium?.color,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: widget.onAuthRequired,
-                        child: Text(
-                          'Sign Up',
-                          style: TextStyle(color: theme.primaryColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              if (isGuest) SizedBox(height: 20),
 
               // Quick Stats
               Padding(
@@ -807,7 +771,7 @@ class _HomePageState extends State<HomePage> {
                                 backgroundColor: isGuest
                                     ? theme.primaryColor.withOpacity(0.7)
                                     : event.isUserAttending
-                                    ? Colors.orange
+                                    ? Colors.green[1000]
                                     : event.isFull
                                     ? Colors.grey
                                     : theme.primaryColor,

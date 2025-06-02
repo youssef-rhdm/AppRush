@@ -131,27 +131,23 @@ class EventService {
   }
 
   // Get events that a user is attending
-  Future<List<Event>> getUserAttendingEvents(int userId) async {
+  Future<List<int>> getUserAttendingEvents(int userId) async {
     try {
       final response = await _supabase
-          .from('events_table')
-          .select('''
-            *,
-            attendee_count:user_events_table(count)
-          ''')
-          .eq('user_events_table.user_id', userId)
-          .eq('event_status', 'approved')
-          .gte('event_date', DateTime.now().toIso8601String())
-          .order('event_date', ascending: true);
+          .from('user_events_table')
+          .select('event_id')
+          .eq('user_id', userId);
 
-      return response
-          .map((json) => Event.fromSupabase(json, currentUserId: userId))
+      // Extract event IDs as a list of ints
+      final eventIds = response
+          .map<int>((json) => json['event_id'] as int)
           .toList();
+      return eventIds;
     } on PostgrestException catch (e) {
-      print('Database error fetching user events: ${e.message}');
+      print('Database error fetching user attending event IDs: ${e.message}');
       return [];
     } catch (e) {
-      print('Error fetching user events: $e');
+      print('Error fetching user attending event IDs: $e');
       return [];
     }
   }
